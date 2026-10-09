@@ -8,6 +8,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Meeting Notes">
 <title>Meeting Notes</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
 <style>
 :root{--bg:#f4f5fb;--card:#fff;--tx:#181a2a;--mut:#74788f;--bd:#e7e9f3;--ac:#5b5bf0;--ac2:#9b5cf6;--soft:#eceeff;--red:#ef4444;--ok:#16a34a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1017;--card:#1a1b27;--tx:#eef0fa;--mut:#9396ad;--bd:#2a2c3e;--ac:#8b8bff;--ac2:#b58bff;--soft:#25274a}}
@@ -43,8 +45,8 @@ input:focus,textarea:focus{border-color:var(--ac)}
 .rec #orb{background:linear-gradient(135deg,#f43f5e,var(--red));box-shadow:0 12px 30px rgba(239,68,68,.45)}
 svg.ic{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #orb svg{width:50px;height:50px}#orb .sq{display:none}.rec #orb .mc{display:none}.rec #orb .sq{display:block}
-.live{min-height:56px;margin-top:16px;padding:12px 14px;background:var(--soft);border-radius:14px;color:var(--tx);font-size:15px;text-align:left}
-.live:empty::before{content:"Live transcript appears here";color:var(--mut)}
+.live{min-height:96px;max-height:220px;overflow-y:auto;margin-top:16px;padding:12px 14px;background:var(--soft);border-radius:14px;font-size:15px;text-align:left}
+.live p{margin:0 0 6px}.live .i{color:var(--mut);font-style:italic}.live .ph{color:var(--mut)}
 .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--soft);color:var(--ac)}
 .tog{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:14px;color:var(--mut)}
 .tog input{width:auto}
@@ -113,6 +115,7 @@ nav b{position:absolute;top:0;right:26%;background:var(--red);color:#fff;border-
 
 <section class="screen" id="s1">
   <div class="card"><h3>Transcript</h3><div id="segs"></div></div>
+  <button class="btn p" id="fix" style="margin-bottom:10px">✨ Fix languages with AI</button>
   <button class="btn" id="clr" style="width:100%">Clear transcript</button>
   <button class="btn" id="newm" style="width:100%;margin-top:8px">＋ New meeting</button>
 </section>
@@ -175,7 +178,7 @@ function load(){let o=null;try{o=JSON.parse(localStorage.getItem(KEY)||'null')}c
   $('date').value=(o&&o.d)||new Date().toISOString().slice(0,10);
   if(o){$('title').value=o.t||'';$('att').value=o.a||'';S.segs=o.s||[];S.acts=o.x||[];S.sum=o.u||null}
   let th='auto';try{th=localStorage.getItem('mn_theme')||'auto'}catch(e){}setTheme(th);
-  renderSegs();renderActs();renderSum()}
+  renderSegs();renderActs();renderSum();renderLive()}
 ['title','date','att'].forEach(i=>$(i).addEventListener('input',save));
 function setTheme(t){const r=document.documentElement;t==='auto'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',t);$$('#theme .chip').forEach(c=>c.classList.toggle('on',c.dataset.t===t));try{localStorage.setItem('mn_theme',t)}catch(e){}}
 $('theme').onclick=e=>e.target.dataset.t&&setTheme(e.target.dataset.t);
@@ -183,14 +186,14 @@ $('theme').onclick=e=>e.target.dataset.t&&setTheme(e.target.dataset.t);
 /* navigation */
 function go(n){$$('.screen').forEach((s,i)=>s.classList.toggle('on',i==n));$$('#nav button').forEach((b,i)=>b.classList.toggle('on',i==n));if(n==1)$('bg').style.display='none'}
 $('nav').onclick=e=>{const b=e.target.closest('button');b&&go(+b.dataset.s)};
-$('langs').onclick=e=>{const l=e.target.dataset.l;if(!l)return;S.mode=l;S.idx=0;$$('#langs .chip').forEach(c=>c.classList.toggle('on',c.dataset.l===l));if(S.rec&&S.sr)try{S.sr.stop()}catch(x){}};
+$('langs').onclick=e=>{const l=e.target.dataset.l;if(!l)return;S.mode=l;S.idx=0;S.tried=new Set();$$('#langs .chip').forEach(c=>c.classList.toggle('on',c.dataset.l===l));if(S.rec&&S.sr)try{S.sr.stop()}catch(x){}};
 
 /* transcript */
 function renderSegs(){
   $('segs').innerHTML=S.segs.length?S.segs.map((s,i)=>`<div class="seg"><div class="m"><span>${esc(s.t)}</span><span class="pill">${NAME[s.l]||'English'}</span></div><div class="x" contenteditable data-i="${i}">${esc(s.x)}</div></div>`).join(''):'<div class="empty">No transcript yet.<br>Record a meeting and it will appear here.</div>'}
 $('segs').addEventListener('input',e=>{const i=e.target.dataset.i;if(i!==undefined){S.segs[i].x=e.target.innerText;S.segs[i].l=scriptLang(e.target.innerText);save()}});
 function addSeg(text){const last=S.segs[S.segs.length-1];if(!text||(last&&last.x===text))return;
-  S.segs.push({t:clock(),l:scriptLang(text),x:text});renderSegs();save();
+  S.segs.push({t:clock(),l:scriptLang(text),x:text});renderSegs();renderLive();save();
   const b=$('bg');if(!$('s1').classList.contains('on')){b.textContent=S.segs.length;b.style.display='block'}}
 $('clr').onclick=()=>{if(confirm('Clear the transcript?')){S.segs=[];S.sum=null;renderSegs();renderSum();save()}};
 $('newm').onclick=()=>{if(!confirm('Start a new meeting? Current notes will be cleared.'))return;if(S.rec)stopRec();
@@ -201,25 +204,39 @@ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 const clock=()=>{const s=S.t0?Math.floor((Date.now()-S.t0)/1000):0;return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
 const curLang=()=>S.mode==='auto'?LANGS[S.idx]:S.mode;
 function showDet(l){const p=$('det');p.style.display='inline-block';p.textContent=(S.mode==='auto'?'Auto · ':'')+NAME[l]}
-function onFinal(text,conf){
-  if(!text)return;const l=scriptLang(text);addSeg($('ts').checked?text:text);
-  if(S.mode==='auto'){const prev=S.idx;
-    if(l==='gu')S.idx=2;else if(l==='hi')S.idx=1;
-    else if(conf&&conf<.55)S.idx=(S.idx+1)%3;      // Latin text with low confidence → try next language
-    showDet(l==='en'&&conf&&conf<.55?LANGS[S.idx].slice(0,2):l);
-    if(prev!==S.idx&&S.sr)try{S.sr.stop()}catch(e){}
-  }else showDet(l)}
+function renderLive(){const L=$('live');let t=S.segs.slice(-5).map(s=>`<p>${esc(s.x)}</p>`).join('');
+  if(S.im)t+=`<p class="i">${esc(S.im)}</p>`;
+  if(!t)t='<p class="ph">'+(S.rec?'Listening… start speaking':'Live transcript appears here')+'</p>';
+  L.innerHTML=t;L.scrollTop=L.scrollHeight}
+function pickNext(){return [1,2,3].map(k=>(S.idx+k)%3).find(k=>k!==S.idx&&!S.bad.has(k)&&!S.tried.has(k))}
+function onFinal(text,c){
+  if(!text)return;addSeg(text);
+  if(S.mode!=='auto'){showDet(scriptLang(text));return}
+  if(!(c>0)){if(++S.noConf===3)toast('Auto-detect is limited on this device. Pick your language chip for best results.');c=.8}
+  S.score[S.idx]=c;
+  if(c>=.7){S.tried.clear();showDet(LANGS[S.idx].slice(0,2));return}
+  S.tried.add(S.idx);let n=pickNext();
+  if(n===undefined){n=S.score.indexOf(Math.max(...S.score));S.tried.clear()}
+  showDet(LANGS[S.idx].slice(0,2));
+  if(n!==S.idx){S.idx=n;if(S.sr)try{S.sr.stop()}catch(e){}}}
 function listen(){
-  if(!S.rec||!SR)return;const r=new SR();let got=false;
-  r.lang=curLang();r.continuous=true;r.interimResults=true;
-  r.onresult=e=>{let im='';for(let i=e.resultIndex;i<e.results.length;i++){const x=e.results[i];if(x.isFinal){got=true;onFinal(x[0].transcript.trim(),x[0].confidence)}else im+=x[0].transcript}
-    $('live').textContent=im};
-  r.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){toast('Microphone permission blocked. Allow it in browser settings.');stopRec()}else if(e.error==='network')toast('Speech recognition needs an internet connection.')};
-  r.onend=()=>{$('live').textContent='';if(!S.rec)return;if(S.mode==='auto'&&!got)S.idx=(S.idx+1)%3;setTimeout(listen,120)};
+  if(!S.rec||!SR)return;const r=new SR();
+  r.lang=curLang();r.continuous=true;r.interimResults=true;r.maxAlternatives=1;
+  r.onstart=()=>{$('hint').textContent='Listening · '+NAME[r.lang.slice(0,2)]+(S.mode==='auto'?' (auto)':'')};
+  r.onresult=e=>{let im='';for(let i=e.resultIndex;i<e.results.length;i++){const x=e.results[i];
+    if(x.isFinal){S.im='';onFinal(x[0].transcript.trim(),x[0].confidence)}else im+=x[0].transcript}
+    S.im=im;renderLive()};
+  r.onerror=e=>{const k=e.error;
+    if(k==='not-allowed'||k==='service-not-allowed'){toast('Microphone/speech permission blocked. Allow it in browser settings.');stopRec()}
+    else if(k==='language-not-supported'){S.bad.add(S.idx);S.score[S.idx]=-1;toast(NAME[r.lang.slice(0,2)]+' speech is not supported on this device.');
+      if(S.mode==='auto'){const ok=[0,1,2].find(j=>!S.bad.has(j));if(ok===undefined){stopRec();return}S.idx=ok}else stopRec()}
+    else if(k==='network')toast('Speech recognition needs an internet connection.');
+    else if(k==='audio-capture')toast('Microphone not available or in use by another app.')};
+  r.onend=()=>{S.im='';renderLive();if(S.rec)setTimeout(listen,250)};
   S.sr=r;try{r.start()}catch(e){}}
 async function startRec(){
   if(!SR&&!(window.MediaRecorder&&$('aud').checked)){toast('Speech recognition is not supported here. Use Chrome, Edge or Safari.');return}
-  S.rec=true;S.t0=Date.now();S.chunks=[];S.blob=null;$('audbtn').disabled=true;
+  S.rec=true;S.t0=Date.now();S.im='';S.tried=new Set();S.bad=S.bad||new Set();S.score=[0,0,0];S.noConf=0;S.idx=S.mode==='auto'?S.idx:0;renderLive();S.chunks=[];S.blob=null;$('audbtn').disabled=true;
   $('stage').classList.add('rec');$('hint').textContent=S.mode==='auto'?'Listening — English, Hindi or Gujarati':'Listening…';
   S.tm=setInterval(()=>$('timer').textContent=clock(),500);
   if($('aud').checked&&navigator.mediaDevices&&window.MediaRecorder){
@@ -235,10 +252,24 @@ function stopRec(){
   try{S.sr&&S.sr.stop()}catch(e){}S.sr=null;
   try{S.mr&&S.mr.state!=='inactive'&&S.mr.stop()}catch(e){}
   S.stream&&S.stream.getTracks().forEach(t=>t.stop());S.stream=null;
-  $('stage').classList.remove('rec');$('live').textContent='';$('hint').textContent=S.segs.length?'Recording saved to Transcript':'Tap the mic to start recording';
-  if(S.segs.length)toast('Stopped. Open Insights to generate a summary.')}
+  $('stage').classList.remove('rec');S.im='';renderLive();$('hint').textContent=S.segs.length?'Recording saved to Transcript':'Tap the mic to start recording';
+  if(S.segs.length)toast('Stopped. If any text looks wrong, tap “Fix languages with AI” in Transcript.')}
 $('orb').onclick=()=>S.rec?stopRec():startRec();
 if(isIOS)$('aud').checked=false;
+
+$('fix').onclick=async()=>{
+  if(!S.segs.length){toast('No transcript to fix yet.');return}
+  const b=$('fix');b.disabled=true;b.innerHTML='<span class="spin"></span>Fixing languages…';
+  try{const sm=window.claude&&await claude.use('sample');
+    if(!sm){toast('AI cleanup is available in the Claude app version.');return}
+    const r=await sm.json(`These lines come from speech recognition that may have used the WRONG language model, for a meeting in English, Hindi or Gujarati (mixed use is possible). For each line decide which language was actually spoken and rewrite it in that language's own script (English in Latin, Hindi in Devanagari, Gujarati in Gujarati script). Undo phonetic transliteration (e.g. English words written in Devanagari) and fix obvious recognition errors. Do not translate or add content.
+Return ONLY a JSON array with one object per line: [{"i":0,"l":"en|hi|gu","x":"corrected text"}]
+Lines:
+`+S.segs.map((s,i)=>i+'|'+s.x).join('\n').slice(0,20000));
+    if(Array.isArray(r)){r.forEach(o=>{const s=S.segs[o.i];if(s&&o.x){s.x=String(o.x);s.l=['en','hi','gu'].includes(o.l)?o.l:scriptLang(s.x)}});renderSegs();renderLive();save();toast('Transcript cleaned up')}
+    else toast('AI cleanup failed. Try again.')
+  }catch(e){toast('AI cleanup unavailable right now.')}
+  finally{b.disabled=false;b.innerHTML='✨ Fix languages with AI'}};
 
 /* action items */
 function renderActs(){$('al').innerHTML=S.acts.length?S.acts.map((a,i)=>`<li class="${a.d?'d':''}"><input type="checkbox" data-i="${i}" ${a.d?'checked':''}><span>${esc(a.t)}</span><button data-x="${i}" aria-label="Delete">✕</button></li>`).join(''):'<li style="color:var(--mut);justify-content:center">No action items yet</li>'}
@@ -329,21 +360,22 @@ $('s3').addEventListener('click',async e=>{
   const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,512,512);g.addColorStop(0,'#5b5bf0');g.addColorStop(1,'#9b5cf6');
   x.fillStyle=g;x.fillRect(0,0,512,512);x.font='280px serif';x.textAlign='center';x.textBaseline='middle';x.fillText('🎙️',256,280);
   const icon=c.toDataURL('image/png'),l=document.createElement('link');l.rel='apple-touch-icon';l.href=icon;document.head.appendChild(l);
-  try{const m=document.createElement('link');m.rel='manifest';m.href=URL.createObjectURL(new Blob([JSON.stringify({name:'Meeting Notes',short_name:'Notes',display:'standalone',orientation:'portrait',start_url:location.href,background_color:'#f4f5fb',theme_color:'#5b5bf0',icons:[{src:icon,sizes:'512x512',type:'image/png',purpose:'any'}]})],{type:'application/manifest+json'}));document.head.appendChild(m)}catch(e){}
+  
   const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
   let dis=false;try{dis=sessionStorage.getItem('mn_ins')==='1'}catch(e){}
   if(standalone||!(isIOS||isAndroid)||dis)return;
-  let def=null;const show=()=>$('ins').classList.add('on'),LI='<li style="display:list-item;border:0">';
+  let def=null;const show=()=>$('ins').classList.add('on'),LI='<li style="display:list-item;border:0">',NOTE='<p style="color:var(--mut);font-size:12px;margin:0 0 12px">Viewing inside another app (e.g. Claude)? Open the link in <b>'+(isIOS?'Safari':'Chrome')+'</b> first — shortcuts can’t be added from inside an app.</p>';
   if(isIOS){const safari=!/CriOS|FxiOS|EdgiOS/.test(ua);
-    $('insb').innerHTML=safari?`<ol>${LI}Tap the <b>Share</b> button (square with arrow).</li>${LI}Tap <b>Add to Home Screen</b>.</li>${LI}Tap <b>Add</b>.</li></ol>`:'<p style="color:var(--mut);font-size:14px">Open this page in <b>Safari</b>, then tap <b>Share → Add to Home Screen</b>.</p>';
+    $('insb').innerHTML=(safari?`<ol>${LI}Tap the <b>Share</b> button (square with arrow).</li>${LI}Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol>`:'<p style="color:var(--mut);font-size:14px">Open this page in <b>Safari</b>, then tap <b>Share → Add to Home Screen</b>.</p>')+NOTE;
     setTimeout(show,1800)}
-  else{$('insb').innerHTML='<p style="color:var(--mut);font-size:14px">Add it to your home screen for a full-screen, app-like experience.</p>';
+  else{$('insb').innerHTML='<p style="color:var(--mut);font-size:14px">Add it to your home screen for one-tap access.</p>'+NOTE;
     addEventListener('beforeinstallprompt',e=>{e.preventDefault();def=e;$('insgo').style.display='';show()});
-    setTimeout(()=>{if(!def){$('insb').innerHTML=`<ol>${LI}Tap the browser menu <b>⋮</b>.</li>${LI}Choose <b>Install app</b> or <b>Add to Home screen</b>.</li></ol>`;show()}},2800)}
+    setTimeout(()=>{if(!def){$('insb').innerHTML=`<ol>${LI}Open the browser menu <b>⋮</b>.</li>${LI}Tap <b>Install app</b> or <b>Add to Home screen</b>.</li></ol>`+NOTE;show()}},2800)}
   $('insgo').onclick=async()=>{if(!def)return;def.prompt();await def.userChoice;def=null;$('ins').classList.remove('on')};
   $('insx').onclick=()=>{$('ins').classList.remove('on');try{sessionStorage.setItem('mn_ins','1')}catch(e){}};
   addEventListener('appinstalled',()=>$('ins').classList.remove('on'));
 })();
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 load();
 </script>
 </body>
