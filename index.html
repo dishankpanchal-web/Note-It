@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b5bf0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Meeting Notes">
+<title>Meeting Notes</title>
+<style>
+:root{--bg:#f4f5fb;--card:#fff;--tx:#181a2a;--mut:#74788f;--bd:#e7e9f3;--ac:#5b5bf0;--ac2:#9b5cf6;--soft:#eceeff;--red:#ef4444;--ok:#16a34a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1017;--card:#1a1b27;--tx:#eef0fa;--mut:#9396ad;--bd:#2a2c3e;--ac:#8b8bff;--ac2:#b58bff;--soft:#25274a}}
+:root[data-theme="dark"]{--bg:#0f1017;--card:#1a1b27;--tx:#eef0fa;--mut:#9396ad;--bd:#2a2c3e;--ac:#8b8bff;--ac2:#b58bff;--soft:#25274a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Gujarati","Noto Sans Devanagari",sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;position:relative}
+header{padding:14px 20px 6px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:20px;margin:0;letter-spacing:-.2px}
+header small{color:var(--mut);display:block;font-size:12px}
+.screen{display:none;flex:1;overflow-y:auto;padding:8px 16px 110px}
+.screen.on{display:block;animation:fi .25s}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:20px;padding:16px;margin-bottom:14px;box-shadow:0 2px 12px rgba(40,40,90,.05)}
+.card h3{margin:0 0 10px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+input,textarea,select{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:11px 12px;outline:none}
+input:focus,textarea:focus{border-color:var(--ac)}
+.ttl{font-size:19px;font-weight:600;background:none;border:0;padding:2px 0;border-bottom:1px solid var(--bd);border-radius:0}
+.two{display:flex;gap:10px;margin-top:10px}.two>*{flex:1;min-width:0}
+.chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.chip{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:8px 16px;font:inherit;font-size:14px;cursor:pointer}
+.chip.on{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border-color:transparent;font-weight:600}
+.stage{text-align:center;padding:18px 0 8px}
+.timer{font-size:38px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:1px;margin:0}
+.hint{color:var(--mut);font-size:13px;min-height:20px;margin:4px 0 18px}
+.orbw{position:relative;width:132px;height:132px;margin:0 auto}
+.orbw i{position:absolute;inset:0;border-radius:50%;background:var(--ac);opacity:0}
+.rec .orbw i{animation:rg 2s infinite}.rec .orbw i:nth-child(2){animation-delay:.7s}
+@keyframes rg{0%{transform:scale(1);opacity:.35}100%{transform:scale(1.7);opacity:0}}
+#orb{position:absolute;inset:0;width:100%;border-radius:50%;border:0;color:#fff;cursor:pointer;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 12px 30px rgba(91,91,240,.45);display:grid;place-items:center;transition:transform .15s}
+#orb:active{transform:scale(.94)}
+.rec #orb{background:linear-gradient(135deg,#f43f5e,var(--red));box-shadow:0 12px 30px rgba(239,68,68,.45)}
+svg.ic{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#orb svg{width:50px;height:50px}#orb .sq{display:none}.rec #orb .mc{display:none}.rec #orb .sq{display:block}
+.live{min-height:56px;margin-top:16px;padding:12px 14px;background:var(--soft);border-radius:14px;color:var(--tx);font-size:15px;text-align:left}
+.live:empty::before{content:"Live transcript appears here";color:var(--mut)}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--soft);color:var(--ac)}
+.tog{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:14px;color:var(--mut)}
+.tog input{width:auto}
+.seg{padding:10px 0;border-bottom:1px solid var(--bd)}.seg:last-child{border:0}
+.seg .m{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--mut);margin-bottom:2px}
+.seg .x{outline:none;font-size:15px;word-break:break-word}
+.empty{text-align:center;color:var(--mut);padding:36px 10px;font-size:14px}
+.btn{font:inherit;border:0;cursor:pointer;border-radius:14px;padding:13px 16px;background:var(--soft);color:var(--ac);font-weight:600}
+.btn.p{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;width:100%;box-shadow:0 8px 20px rgba(91,91,240,.3)}
+.btn:disabled{opacity:.5}
+.sum p{margin:0 0 10px}.sum ul{margin:0 0 10px;padding-left:20px}
+.sum h4{margin:12px 0 6px;font-size:14px}
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--bd)}
+.tl li span{flex:1}.tl li.d span{text-decoration:line-through;color:var(--mut)}
+.tl input{width:20px;height:20px;padding:0;accent-color:var(--ac)}
+.tl button{border:0;background:none;color:var(--mut);font-size:16px;cursor:pointer}
+.row{display:flex;gap:8px;margin-top:10px}.row input{flex:1}.row .btn{padding:10px 16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fmt{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:16px;padding:16px 10px;font:inherit;cursor:pointer;text-align:center}
+.fmt b{display:block;font-size:15px}.fmt span{font-size:12px;color:var(--mut)}
+.fmt:active{background:var(--soft)}.fmt:disabled{opacity:.4}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;justify-content:center;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--bd);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+nav div{display:flex;width:100%;max-width:560px}
+nav button{flex:1;border:0;background:none;color:var(--mut);font:inherit;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px;cursor:pointer;position:relative}
+nav button.on{color:var(--ac);font-weight:600}
+nav b{position:absolute;top:0;right:26%;background:var(--red);color:#fff;border-radius:99px;font-size:10px;padding:0 5px;display:none}
+#toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:#222538;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:30;max-width:88%;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%)}
+#ins{position:fixed;left:0;right:0;bottom:0;z-index:20;display:none;justify-content:center;padding:0 12px calc(78px + env(safe-area-inset-bottom,0px))}
+#ins.on{display:flex}
+#ins>div{width:100%;max-width:520px;background:var(--card);border:1px solid var(--bd);border-radius:22px;padding:18px;box-shadow:0 14px 50px rgba(0,0,0,.28);animation:fi .3s}
+#ins ol{margin:8px 0 12px;padding-left:20px;color:var(--mut);font-size:14px}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-3px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div id="app">
+<header><div><h1>Meeting Notes</h1><small id="sub">English · ગુજરાતી · हिन्दी</small></div><span class="pill" id="det" style="display:none"></span></header>
+
+<section class="screen on" id="s0">
+  <div class="card">
+    <input class="ttl" id="title" placeholder="Meeting title">
+    <div class="two"><input id="date" type="date" aria-label="Date"><input id="att" placeholder="Attendees"></div>
+  </div>
+  <div class="card" id="stage">
+    <div class="chips" id="langs">
+      <button class="chip on" data-l="auto">✨ Auto</button><button class="chip" data-l="en-IN">English</button><button class="chip" data-l="hi-IN">हिन्दी</button><button class="chip" data-l="gu-IN">ગુજરાતી</button>
+    </div>
+    <div class="stage">
+      <p class="timer" id="timer">00:00</p>
+      <p class="hint" id="hint">Tap the mic to start recording</p>
+      <div class="orbw"><i></i><i></i>
+        <button id="orb" aria-label="Start or stop recording">
+          <svg class="ic mc" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg>
+          <svg class="ic sq" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+        </button>
+      </div>
+      <div class="live" id="live"></div>
+    </div>
+    <label class="tog"><span>Timestamps in transcript</span><input type="checkbox" id="ts" checked></label>
+    <label class="tog"><span>Also save audio recording</span><input type="checkbox" id="aud"></label>
+  </div>
+</section>
+
+<section class="screen" id="s1">
+  <div class="card"><h3>Transcript</h3><div id="segs"></div></div>
+  <button class="btn" id="clr" style="width:100%">Clear transcript</button>
+  <button class="btn" id="newm" style="width:100%;margin-top:8px">＋ New meeting</button>
+</section>
+
+<section class="screen" id="s2">
+  <div class="card">
+    <h3>Summary & action points</h3>
+    <button class="btn p" id="gen">✨ Generate summary</button>
+    <div class="two"><select id="slang" aria-label="Summary language"><option>English</option><option>ગુજરાતી</option><option>हिन्दी</option></select><span class="hint" style="margin:10px 0 0">Summary language</span></div>
+  </div>
+  <div class="card sum" id="sumc" style="display:none"></div>
+  <div class="card"><h3>Action items</h3>
+    <ul class="tl" id="al"></ul>
+    <div class="row"><input id="ai" placeholder="Add an action item"><button class="btn" id="aib">Add</button></div>
+  </div>
+</section>
+
+<section class="screen" id="s3">
+  <div class="card"><h3>Export meeting</h3>
+    <div class="grid">
+      <button class="fmt" data-f="docx"><b>Word</b><span>.docx</span></button>
+      <button class="fmt" data-f="pdf"><b>PDF</b><span>.pdf</span></button>
+      <button class="fmt" data-f="txt"><b>Text</b><span>.txt</span></button>
+      <button class="fmt" data-f="md"><b>Markdown</b><span>.md</span></button>
+      <button class="fmt" data-f="html"><b>Web page</b><span>.html</span></button>
+      <button class="fmt" data-f="json"><b>JSON</b><span>.json</span></button>
+      <button class="fmt" data-f="audio" id="audbtn" disabled style="grid-column:span 2"><b>Audio recording</b><span>Enable “Save audio” and record first</span></button>
+    </div>
+  </div>
+  <div class="card"><h3>Appearance</h3><div class="chips" id="theme"><button class="chip" data-t="auto">Auto</button><button class="chip" data-t="light">Light</button><button class="chip" data-t="dark">Dark</button></div></div>
+</section>
+
+<nav><div id="nav">
+  <button class="on" data-s="0"><svg class="ic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg>Record</button>
+  <button data-s="1"><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>Transcript<b id="bg"></b></button>
+  <button data-s="2"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17v4M17 19h4"/></svg>Insights</button>
+  <button data-s="3"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export</button>
+</div></nav>
+
+<div id="ins"><div><strong>📲 Install Meeting Notes</strong><div id="insb"></div>
+  <div style="display:flex;gap:8px"><button class="btn p" id="insgo" style="display:none;width:auto;flex:1">Install</button><button class="btn" id="insx" style="flex:1">Not now</button></div></div></div>
+<div id="toast"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const $=id=>document.getElementById(id), $$=s=>[...document.querySelectorAll(s)];
+const S={rec:false,sr:null,mr:null,stream:null,chunks:[],blob:null,ext:'webm',t0:0,tm:null,mode:'auto',idx:0,segs:[],acts:[],sum:null,im:''};
+const LANGS=['en-IN','hi-IN','gu-IN'], NAME={en:'English',hi:'हिन्दी',gu:'ગુજરાતી'};
+const KEY='mn_v2', ua=navigator.userAgent;
+const isIOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1), isAndroid=/Android/i.test(ua);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let tt;const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),3200)};
+const scriptLang=t=>{const g=(t.match(/[\u0A80-\u0AFF]/g)||[]).length,h=(t.match(/[\u0900-\u097F]/g)||[]).length;return g>h&&g>0?'gu':h>0?'hi':'en'};
+
+/* persistence */
+function save(){try{localStorage.setItem(KEY,JSON.stringify({t:$('title').value,d:$('date').value,a:$('att').value,s:S.segs,x:S.acts,u:S.sum}))}catch(e){}}
+function load(){let o=null;try{o=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+  $('date').value=(o&&o.d)||new Date().toISOString().slice(0,10);
+  if(o){$('title').value=o.t||'';$('att').value=o.a||'';S.segs=o.s||[];S.acts=o.x||[];S.sum=o.u||null}
+  let th='auto';try{th=localStorage.getItem('mn_theme')||'auto'}catch(e){}setTheme(th);
+  renderSegs();renderActs();renderSum()}
+['title','date','att'].forEach(i=>$(i).addEventListener('input',save));
+function setTheme(t){const r=document.documentElement;t==='auto'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',t);$$('#theme .chip').forEach(c=>c.classList.toggle('on',c.dataset.t===t));try{localStorage.setItem('mn_theme',t)}catch(e){}}
+$('theme').onclick=e=>e.target.dataset.t&&setTheme(e.target.dataset.t);
+
+/* navigation */
+function go(n){$$('.screen').forEach((s,i)=>s.classList.toggle('on',i==n));$$('#nav button').forEach((b,i)=>b.classList.toggle('on',i==n));if(n==1)$('bg').style.display='none'}
+$('nav').onclick=e=>{const b=e.target.closest('button');b&&go(+b.dataset.s)};
+$('langs').onclick=e=>{const l=e.target.dataset.l;if(!l)return;S.mode=l;S.idx=0;$$('#langs .chip').forEach(c=>c.classList.toggle('on',c.dataset.l===l));if(S.rec&&S.sr)try{S.sr.stop()}catch(x){}};
+
+/* transcript */
+function renderSegs(){
+  $('segs').innerHTML=S.segs.length?S.segs.map((s,i)=>`<div class="seg"><div class="m"><span>${esc(s.t)}</span><span class="pill">${NAME[s.l]||'English'}</span></div><div class="x" contenteditable data-i="${i}">${esc(s.x)}</div></div>`).join(''):'<div class="empty">No transcript yet.<br>Record a meeting and it will appear here.</div>'}
+$('segs').addEventListener('input',e=>{const i=e.target.dataset.i;if(i!==undefined){S.segs[i].x=e.target.innerText;S.segs[i].l=scriptLang(e.target.innerText);save()}});
+function addSeg(text){const last=S.segs[S.segs.length-1];if(!text||(last&&last.x===text))return;
+  S.segs.push({t:clock(),l:scriptLang(text),x:text});renderSegs();save();
+  const b=$('bg');if(!$('s1').classList.contains('on')){b.textContent=S.segs.length;b.style.display='block'}}
+$('clr').onclick=()=>{if(confirm('Clear the transcript?')){S.segs=[];S.sum=null;renderSegs();renderSum();save()}};
+$('newm').onclick=()=>{if(!confirm('Start a new meeting? Current notes will be cleared.'))return;if(S.rec)stopRec();
+  ['title','att'].forEach(i=>$(i).value='');$('date').value=new Date().toISOString().slice(0,10);S.segs=[];S.acts=[];S.sum=null;S.blob=null;$('audbtn').disabled=true;$('timer').textContent='00:00';renderSegs();renderActs();renderSum();save();go(0)};
+
+/* recording + ASR with automatic language switching */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const clock=()=>{const s=S.t0?Math.floor((Date.now()-S.t0)/1000):0;return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+const curLang=()=>S.mode==='auto'?LANGS[S.idx]:S.mode;
+function showDet(l){const p=$('det');p.style.display='inline-block';p.textContent=(S.mode==='auto'?'Auto · ':'')+NAME[l]}
+function onFinal(text,conf){
+  if(!text)return;const l=scriptLang(text);addSeg($('ts').checked?text:text);
+  if(S.mode==='auto'){const prev=S.idx;
+    if(l==='gu')S.idx=2;else if(l==='hi')S.idx=1;
+    else if(conf&&conf<.55)S.idx=(S.idx+1)%3;      // Latin text with low confidence → try next language
+    showDet(l==='en'&&conf&&conf<.55?LANGS[S.idx].slice(0,2):l);
+    if(prev!==S.idx&&S.sr)try{S.sr.stop()}catch(e){}
+  }else showDet(l)}
+function listen(){
+  if(!S.rec||!SR)return;const r=new SR();let got=false;
+  r.lang=curLang();r.continuous=true;r.interimResults=true;
+  r.onresult=e=>{let im='';for(let i=e.resultIndex;i<e.results.length;i++){const x=e.results[i];if(x.isFinal){got=true;onFinal(x[0].transcript.trim(),x[0].confidence)}else im+=x[0].transcript}
+    $('live').textContent=im};
+  r.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){toast('Microphone permission blocked. Allow it in browser settings.');stopRec()}else if(e.error==='network')toast('Speech recognition needs an internet connection.')};
+  r.onend=()=>{$('live').textContent='';if(!S.rec)return;if(S.mode==='auto'&&!got)S.idx=(S.idx+1)%3;setTimeout(listen,120)};
+  S.sr=r;try{r.start()}catch(e){}}
+async function startRec(){
+  if(!SR&&!(window.MediaRecorder&&$('aud').checked)){toast('Speech recognition is not supported here. Use Chrome, Edge or Safari.');return}
+  S.rec=true;S.t0=Date.now();S.chunks=[];S.blob=null;$('audbtn').disabled=true;
+  $('stage').classList.add('rec');$('hint').textContent=S.mode==='auto'?'Listening — English, Hindi or Gujarati':'Listening…';
+  S.tm=setInterval(()=>$('timer').textContent=clock(),500);
+  if($('aud').checked&&navigator.mediaDevices&&window.MediaRecorder){
+    try{S.stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mt=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+      S.mr=new MediaRecorder(S.stream,mt?{mimeType:mt}:{});S.ext=(S.mr.mimeType||'').includes('mp4')?'mp4':'webm';
+      S.mr.ondataavailable=e=>e.data.size&&S.chunks.push(e.data);
+      S.mr.onstop=()=>{S.blob=new Blob(S.chunks,{type:S.mr.mimeType});$('audbtn').disabled=false;$('audbtn').querySelector('span').textContent='.'+S.ext};
+      S.mr.start(1000)}catch(e){toast('Audio capture unavailable ('+(e.name||'error')+')')}}
+  if(S.rec)listen()}
+function stopRec(){
+  S.rec=false;clearInterval(S.tm);
+  try{S.sr&&S.sr.stop()}catch(e){}S.sr=null;
+  try{S.mr&&S.mr.state!=='inactive'&&S.mr.stop()}catch(e){}
+  S.stream&&S.stream.getTracks().forEach(t=>t.stop());S.stream=null;
+  $('stage').classList.remove('rec');$('live').textContent='';$('hint').textContent=S.segs.length?'Recording saved to Transcript':'Tap the mic to start recording';
+  if(S.segs.length)toast('Stopped. Open Insights to generate a summary.')}
+$('orb').onclick=()=>S.rec?stopRec():startRec();
+if(isIOS)$('aud').checked=false;
+
+/* action items */
+function renderActs(){$('al').innerHTML=S.acts.length?S.acts.map((a,i)=>`<li class="${a.d?'d':''}"><input type="checkbox" data-i="${i}" ${a.d?'checked':''}><span>${esc(a.t)}</span><button data-x="${i}" aria-label="Delete">✕</button></li>`).join(''):'<li style="color:var(--mut);justify-content:center">No action items yet</li>'}
+function addAct(t){t=(t||'').trim();if(!t||S.acts.some(a=>a.t===t))return;S.acts.push({t,d:false})}
+$('aib').onclick=()=>{addAct($('ai').value);$('ai').value='';renderActs();save()};
+$('ai').onkeydown=e=>{if(e.key==='Enter')$('aib').click()};
+$('al').onclick=e=>{const t=e.target;if(t.dataset.x!==undefined)S.acts.splice(+t.dataset.x,1);else if(t.dataset.i!==undefined)S.acts[+t.dataset.i].d=t.checked;else return;renderActs();save()};
+
+/* summary: Claude when available, on-device fallback otherwise */
+function renderSum(){const c=$('sumc'),u=S.sum;if(!u){c.style.display='none';return}c.style.display='block';
+  const L=a=>a&&a.length?'<ul>'+a.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'';
+  c.innerHTML=`<h3>Summary</h3><p>${esc(u.summary||'')}</p>${u.points&&u.points.length?'<h4>Key points</h4>'+L(u.points):''}${u.decisions&&u.decisions.length?'<h4>Decisions</h4>'+L(u.decisions):''}`}
+function localSum(text){
+  const W=s=>s.toLowerCase().split(/[^\p{L}\p{M}]+/u).filter(w=>w.length>3);
+  const sents=text.split(/(?<=[.!?।])\s+|\n+/).map(s=>s.replace(/^\[\d+:\d+\]\s*/,'').trim()).filter(s=>s.length>14);
+  const f={};sents.forEach(s=>W(s).forEach(w=>f[w]=(f[w]||0)+1));
+  const sc=sents.map((s,i)=>({s,i,v:W(s).reduce((a,w)=>a+f[w],0)/(s.length/6+1)})).sort((a,b)=>b.v-a.v);
+  const AR=/\b(will|need to|needs to|should|must|todo|to-do|action|follow up|deadline|please|assign|by (mon|tue|wed|thu|fri|sat|sun|tomorrow|next))\b|करना|करेंगे|चाहिए|जरूरी|ज़रूरी|કરવું|કરીશ|કરવાનું|જોઈએ|કરશે/i;
+  const ord=a=>a.sort((x,y)=>x.i-y.i).map(o=>o.s);
+  return{summary:ord(sc.slice(0,3)).join(' '),points:ord(sc.slice(3,8)),decisions:[],actionItems:sents.filter(s=>AR.test(s)).slice(0,8).map(t=>({task:t,owner:''}))}}
+$('gen').onclick=async()=>{
+  const text=S.segs.map(s=>`[${s.t}] ${s.x}`).join('\n');
+  if(text.length<20){toast('Record or type some conversation first.');return}
+  const b=$('gen');b.disabled=true;b.innerHTML='<span class="spin"></span>Analysing conversation…';
+  let res=null;
+  try{const sm=window.claude&&await claude.use('sample');
+    if(sm){res=await sm.json(`You are a meeting assistant. The transcript below may mix English, Gujarati and Hindi (speech-to-text output; fix obvious recognition errors from context). Write ALL output in ${$('slang').value}.
+Return ONLY JSON: {"summary":"3-5 sentence overview","keyPoints":["..."],"decisions":["..."],"actionItems":[{"task":"clear actionable task","owner":"name or empty"}]}
+Transcript:
+${text.slice(0,24000)}`)}
+  }catch(e){res=null}
+  let note='';
+  if(!res||typeof res!=='object'){res=localSum(text);note='Used the on-device summary (AI summary unavailable).'}
+  S.sum={summary:res.summary||'',points:res.keyPoints||res.points||[],decisions:res.decisions||[]};
+  (res.actionItems||[]).forEach(a=>addAct(typeof a==='string'?a:((a.owner?a.owner+': ':'')+a.task)));
+  renderSum();renderActs();save();b.disabled=false;b.innerHTML='✨ Regenerate summary';toast(note||'Summary and action points ready');
+};
+
+/* export */
+function data(){return{title:$('title').value.trim()||'Untitled meeting',date:$('date').value,att:$('att').value.trim(),segs:S.segs,sum:S.sum,acts:S.acts}}
+function blocks(d){const B=[],h=t=>B.push({t,sz:14,b:1,h:1}),p=(t,sz)=>B.push({t,sz:sz||11}),u=d.sum;
+  B.push({t:d.title,sz:20,b:1,title:1});p('Date: '+d.date);if(d.att)p('Attendees: '+d.att);
+  if(u){B.push({t:'',sz:6});h('Summary');p(u.summary);if(u.points.length){h('Key points');u.points.forEach(x=>p('• '+x))}if(u.decisions.length){h('Decisions');u.decisions.forEach(x=>p('• '+x))}}
+  B.push({t:'',sz:6});h('Action items');d.acts.length?d.acts.forEach(a=>p((a.d?'[x] ':'[ ] ')+a.t)):p('(none)');
+  B.push({t:'',sz:6});h('Transcript');d.segs.length?d.segs.forEach(s=>p(`[${s.t}] ${s.x}`)):p('(none)');return B}
+const asText=(d,md)=>blocks(d).map(b=>md?(b.title?'# ':b.h?'## ':'')+b.t:b.t).join('\n');
+function asHTML(d){const B=blocks(d).map(b=>b.title?`<h1>${esc(b.t)}</h1>`:b.h?`<h2>${esc(b.t)}</h2>`:`<p>${esc(b.t)}</p>`).join('');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(d.title)}</title><style>body{font-family:system-ui,sans-serif;max-width:760px;margin:30px auto;padding:0 16px;line-height:1.55}p{margin:.3em 0}</style></head><body>${B}</body></html>`}
+async function asDocx(d){
+  const P=b=>`<w:p><w:r><w:rPr>${b.b?'<w:b/>':''}<w:sz w:val="${b.sz*2}"/></w:rPr><w:t xml:space="preserve">${esc(b.t)}</w:t></w:r></w:p>`;
+  const z=new JSZip();
+  z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  z.file('word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+blocks(d).map(P).join('')+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>');
+  return z.generateAsync({type:'blob'})}
+function asPdf(d){
+  const B=blocks(d),doc=new jspdf.jsPDF({unit:'pt',format:'a4'}),W=595.28,H=841.89,m=48,nonLatin=/[^\u0000-\u024F\u2000-\u206F\u2190-\u27BF]/.test(B.map(b=>b.t).join(''));
+  if(!nonLatin){let y=m;
+    B.forEach(b=>{doc.setFont('helvetica',b.b?'bold':'normal');doc.setFontSize(b.sz);doc.splitTextToSize(b.t||' ',W-2*m).forEach(l=>{if(y>H-m){doc.addPage();y=m}doc.text(l,m,y);y+=b.sz*1.4})});
+    return doc.output('arraybuffer')}
+  // Gujarati/Hindi: draw with the device's fonts onto page canvases so every script renders correctly
+  const K=2,cv=[],mk=()=>{const c=document.createElement('canvas');c.width=W*K;c.height=H*K;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle='#111';x.textBaseline='top';cv.push(c);return x};
+  let x=mk(),y=m*K;
+  B.forEach(b=>{x.font=`${b.b?'bold ':''}${b.sz*K}px "Noto Sans Gujarati","Noto Sans Devanagari",system-ui,sans-serif`;const mw=(W-2*m)*K;
+    let line='';const out=[];(b.t||' ').split(/(\s+)/).forEach(w=>{if(x.measureText(line+w).width>mw&&line){out.push(line);line=w.trimStart()}else line+=w});out.push(line);
+    out.forEach(l=>{if(y>(H-m)*K){x=mk();y=m*K}x.fillText(l,m*K,y);y+=b.sz*1.5*K})});
+  cv.forEach((c,i)=>{if(i)doc.addPage();doc.addImage(c.toDataURL('image/jpeg',.88),'JPEG',0,0,W,H)});
+  return doc.output('arraybuffer')}
+async function dl(name,payload,mime){
+  try{const D=window.claude&&await claude.use('downloads');if(D){await D.save({filename:name,data:payload});return}}
+  catch(e){if(e&&e.code==='declined')return;if(e&&e.code==='rate_limited'){toast('Finish the open save prompt first.');return}}
+  const blob=payload instanceof Blob?payload:new Blob([payload],{type:mime});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+$('s3').addEventListener('click',async e=>{
+  const f=(e.target.closest('.fmt')||{dataset:{}}).dataset.f;if(!f)return;const d=data(),n=(d.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'meeting')+'-'+d.date;
+  try{
+    if(f==='txt')await dl(n+'.txt',asText(d,0),'text/plain');
+    else if(f==='md')await dl(n+'.md',asText(d,1),'text/markdown');
+    else if(f==='html')await dl(n+'.html',asHTML(d),'text/html');
+    else if(f==='json')await dl(n+'.json',JSON.stringify(d,null,2),'application/json');
+    else if(f==='docx')await dl(n+'.docx',await asDocx(d));
+    else if(f==='pdf')await dl(n+'.pdf',asPdf(d),'application/pdf');
+    else if(f==='audio'&&S.blob)await dl(n+'-audio.'+S.ext,S.blob);
+  }catch(err){toast('Export failed: '+(err.message||err))}});
+
+/* install popup + app icon/manifest */
+(function(){
+  const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,512,512);g.addColorStop(0,'#5b5bf0');g.addColorStop(1,'#9b5cf6');
+  x.fillStyle=g;x.fillRect(0,0,512,512);x.font='280px serif';x.textAlign='center';x.textBaseline='middle';x.fillText('🎙️',256,280);
+  const icon=c.toDataURL('image/png'),l=document.createElement('link');l.rel='apple-touch-icon';l.href=icon;document.head.appendChild(l);
+  try{const m=document.createElement('link');m.rel='manifest';m.href=URL.createObjectURL(new Blob([JSON.stringify({name:'Meeting Notes',short_name:'Notes',display:'standalone',orientation:'portrait',start_url:location.href,background_color:'#f4f5fb',theme_color:'#5b5bf0',icons:[{src:icon,sizes:'512x512',type:'image/png',purpose:'any'}]})],{type:'application/manifest+json'}));document.head.appendChild(m)}catch(e){}
+  const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  let dis=false;try{dis=sessionStorage.getItem('mn_ins')==='1'}catch(e){}
+  if(standalone||!(isIOS||isAndroid)||dis)return;
+  let def=null;const show=()=>$('ins').classList.add('on'),LI='<li style="display:list-item;border:0">';
+  if(isIOS){const safari=!/CriOS|FxiOS|EdgiOS/.test(ua);
+    $('insb').innerHTML=safari?`<ol>${LI}Tap the <b>Share</b> button (square with arrow).</li>${LI}Tap <b>Add to Home Screen</b>.</li>${LI}Tap <b>Add</b>.</li></ol>`:'<p style="color:var(--mut);font-size:14px">Open this page in <b>Safari</b>, then tap <b>Share → Add to Home Screen</b>.</p>';
+    setTimeout(show,1800)}
+  else{$('insb').innerHTML='<p style="color:var(--mut);font-size:14px">Add it to your home screen for a full-screen, app-like experience.</p>';
+    addEventListener('beforeinstallprompt',e=>{e.preventDefault();def=e;$('insgo').style.display='';show()});
+    setTimeout(()=>{if(!def){$('insb').innerHTML=`<ol>${LI}Tap the browser menu <b>⋮</b>.</li>${LI}Choose <b>Install app</b> or <b>Add to Home screen</b>.</li></ol>`;show()}},2800)}
+  $('insgo').onclick=async()=>{if(!def)return;def.prompt();await def.userChoice;def=null;$('ins').classList.remove('on')};
+  $('insx').onclick=()=>{$('ins').classList.remove('on');try{sessionStorage.setItem('mn_ins','1')}catch(e){}};
+  addEventListener('appinstalled',()=>$('ins').classList.remove('on'));
+})();
+load();
+</script>
+</body>
+</html>
