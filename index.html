@@ -82,6 +82,7 @@ nav b{position:absolute;top:0;right:26%;background:var(--red);color:#fff;border-
 #ins ol{margin:8px 0 12px;padding-left:20px;color:var(--mut);font-size:14px}
 .spin{display:inline-block;width:16px;height:16px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-3px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.ind{display:flex;gap:16px;justify-content:center;font-size:12px;color:var(--mut);margin:-6px 0 12px}.ind .on{color:var(--ok)}.ind .warn{color:#f59e0b}
 </style>
 </head>
 <body>
@@ -99,6 +100,7 @@ nav b{position:absolute;top:0;right:26%;background:var(--red);color:#fff;border-
     </div>
     <div class="stage">
       <p class="timer" id="timer">00:00</p>
+      <div class="ind"><span id="iA">● Audio</span><span id="iS">● Speech</span></div>
       <p class="hint" id="hint">Tap the mic to start recording</p>
       <div class="orbw"><i></i><i></i>
         <button id="orb" aria-label="Start or stop recording">
@@ -109,11 +111,13 @@ nav b{position:absolute;top:0;right:26%;background:var(--red);color:#fff;border-
       <div class="live" id="live"></div>
     </div>
     <label class="tog"><span>Timestamps in transcript</span><input type="checkbox" id="ts" checked></label>
-    <label class="tog"><span>Also save audio recording</span><input type="checkbox" id="aud"></label>
+    <label class="tog"><span>Record audio continuously</span><input type="checkbox" id="aud" checked></label>
+    <label class="tog"><span>Auto-polish transcript &amp; write report when I stop</span><input type="checkbox" id="auto" checked></label>
   </div>
 </section>
 
 <section class="screen" id="s1">
+  <div class="card" id="pc" style="display:none"><h3>Recording</h3><audio id="player" controls style="width:100%"></audio></div>
   <div class="card"><h3>Transcript</h3><div id="segs"></div></div>
   <button class="btn p" id="fix" style="margin-bottom:10px">✨ Fix languages with AI</button>
   <button class="btn" id="clr" style="width:100%">Clear transcript</button>
@@ -122,9 +126,9 @@ nav b{position:absolute;top:0;right:26%;background:var(--red);color:#fff;border-
 
 <section class="screen" id="s2">
   <div class="card">
-    <h3>Summary & action points</h3>
-    <button class="btn p" id="gen">✨ Generate summary</button>
-    <div class="two"><select id="slang" aria-label="Summary language"><option>English</option><option>ગુજરાતી</option><option>हिन्दी</option></select><span class="hint" style="margin:10px 0 0">Summary language</span></div>
+    <h3>Summary, detailed report & actions</h3>
+    <button class="btn p" id="gen">✨ Generate summary &amp; detailed report</button>
+    <div class="two"><select id="slang" aria-label="Report language"><option value="English">English</option><option value="Gujarati">ગુજરાતી</option><option value="Hindi">हिन्दी</option><option value="mixed">As spoken (mixed)</option></select><span class="hint" style="margin:10px 0 0">Report language</span></div>
   </div>
   <div class="card sum" id="sumc" style="display:none"></div>
   <div class="card"><h3>Action items</h3>
@@ -173,10 +177,10 @@ let tt;const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('on');
 const scriptLang=t=>{const g=(t.match(/[\u0A80-\u0AFF]/g)||[]).length,h=(t.match(/[\u0900-\u097F]/g)||[]).length;return g>h&&g>0?'gu':h>0?'hi':'en'};
 
 /* persistence */
-function save(){try{localStorage.setItem(KEY,JSON.stringify({t:$('title').value,d:$('date').value,a:$('att').value,s:S.segs,x:S.acts,u:S.sum}))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({t:$('title').value,d:$('date').value,a:$('att').value,s:S.segs,x:S.acts,u:S.sum,r:S.dur}))}catch(e){}}
 function load(){let o=null;try{o=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
   $('date').value=(o&&o.d)||new Date().toISOString().slice(0,10);
-  if(o){$('title').value=o.t||'';$('att').value=o.a||'';S.segs=o.s||[];S.acts=o.x||[];S.sum=o.u||null}
+  if(o){$('title').value=o.t||'';$('att').value=o.a||'';S.segs=o.s||[];S.acts=o.x||[];S.sum=o.u||null;S.dur=o.r||0}
   let th='auto';try{th=localStorage.getItem('mn_theme')||'auto'}catch(e){}setTheme(th);
   renderSegs();renderActs();renderSum();renderLive()}
 ['title','date','att'].forEach(i=>$(i).addEventListener('input',save));
@@ -189,21 +193,31 @@ $('nav').onclick=e=>{const b=e.target.closest('button');b&&go(+b.dataset.s)};
 $('langs').onclick=e=>{const l=e.target.dataset.l;if(!l)return;S.mode=l;S.idx=0;S.tried=new Set();$$('#langs .chip').forEach(c=>c.classList.toggle('on',c.dataset.l===l));if(S.rec&&S.sr)try{S.sr.stop()}catch(x){}};
 
 /* transcript */
+const labels=t=>{const g=(t.match(/[\u0A80-\u0AFF]/g)||[]).length,hh=(t.match(/[\u0900-\u097F]/g)||[]).length,e=(t.match(/[A-Za-z]/g)||[]).length,n=g+hh+e||1,o=[];if(e/n>.15||!(g+hh))o.push('EN');if(g/n>.15)o.push('GU');if(hh/n>.15)o.push('HI');return o};
+const lab=t=>labels(t).join('+');
 function renderSegs(){
-  $('segs').innerHTML=S.segs.length?S.segs.map((s,i)=>`<div class="seg"><div class="m"><span>${esc(s.t)}</span><span class="pill">${NAME[s.l]||'English'}</span></div><div class="x" contenteditable data-i="${i}">${esc(s.x)}</div></div>`).join(''):'<div class="empty">No transcript yet.<br>Record a meeting and it will appear here.</div>'}
+  $('segs').innerHTML=S.segs.length?S.segs.map((s,i)=>`<div class="seg"><div class="m"><span>${esc(s.t)}</span><span class="pill">${lab(s.x)}</span></div><div class="x" contenteditable data-i="${i}">${esc(s.x)}</div></div>`).join(''):'<div class="empty">No transcript yet.<br>Record a meeting and it will appear here.</div>'}
 $('segs').addEventListener('input',e=>{const i=e.target.dataset.i;if(i!==undefined){S.segs[i].x=e.target.innerText;S.segs[i].l=scriptLang(e.target.innerText);save()}});
-function addSeg(text){const last=S.segs[S.segs.length-1];if(!text||(last&&last.x===text))return;
-  S.segs.push({t:clock(),l:scriptLang(text),x:text});renderSegs();renderLive();save();
+function addSeg(text){
+  if(!text)return;const last=S.segs[S.segs.length-1],now=Date.now();
+  if(last&&last.ms&&now-last.ms<4000){   // phone browsers sometimes repeat/extend the previous phrase
+    if(last.x===text||last.x.startsWith(text))return;
+    if(text.startsWith(last.x)){last.x=text;last.ms=now;renderSegs();renderLive();save();return}}
+  S.segs.push({t:clock(),l:scriptLang(text),x:text,ms:now});renderSegs();renderLive();save();
   const b=$('bg');if(!$('s1').classList.contains('on')){b.textContent=S.segs.length;b.style.display='block'}}
-$('clr').onclick=()=>{if(confirm('Clear the transcript?')){S.segs=[];S.sum=null;renderSegs();renderSum();save()}};
+$('clr').onclick=()=>{if(confirm('Clear the transcript?')){S.segs=[];S.sum=null;renderSegs();renderSum();renderLive();save()}};
 $('newm').onclick=()=>{if(!confirm('Start a new meeting? Current notes will be cleared.'))return;if(S.rec)stopRec();
-  ['title','att'].forEach(i=>$(i).value='');$('date').value=new Date().toISOString().slice(0,10);S.segs=[];S.acts=[];S.sum=null;S.blob=null;$('audbtn').disabled=true;$('timer').textContent='00:00';renderSegs();renderActs();renderSum();save();go(0)};
+  ['title','att'].forEach(i=>$(i).value='');$('date').value=new Date().toISOString().slice(0,10);S.segs=[];S.acts=[];S.sum=null;S.blob=null;S.dur=0;$('pc').style.display='none';$('audbtn').disabled=true;$('timer').textContent='00:00';renderSegs();renderActs();renderSum();renderLive();save();go(0)};
 
-/* recording + ASR with automatic language switching */
+/* recording + ASR: audio is captured continuously, speech recognition auto-restarts instantly */
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-const clock=()=>{const s=S.t0?Math.floor((Date.now()-S.t0)/1000):0;return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+const clock=()=>fmt(S.t0?Math.floor((Date.now()-S.t0)/1000):0);
 const curLang=()=>S.mode==='auto'?LANGS[S.idx]:S.mode;
 function showDet(l){const p=$('det');p.style.display='inline-block';p.textContent=(S.mode==='auto'?'Auto · ':'')+NAME[l]}
+function ind(){$('iA').className=S.mr&&S.mr.state==='recording'?'on':(S.rec&&$('aud').checked?'warn':'');$('iS').className=S.running?'on':(S.rec?'warn':'')}
+async function wl(on){try{if(on){if(!S.wl)S.wl=await navigator.wakeLock.request('screen')}else if(S.wl){await S.wl.release();S.wl=null}}catch(e){S.wl=null}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.rec){wl(true);listen()}});
 function renderLive(){const L=$('live');let t=S.segs.slice(-5).map(s=>`<p>${esc(s.x)}</p>`).join('');
   if(S.im)t+=`<p class="i">${esc(S.im)}</p>`;
   if(!t)t='<p class="ph">'+(S.rec?'Listening… start speaking':'Live transcript appears here')+'</p>';
@@ -212,7 +226,7 @@ function pickNext(){return [1,2,3].map(k=>(S.idx+k)%3).find(k=>k!==S.idx&&!S.bad
 function onFinal(text,c){
   if(!text)return;addSeg(text);
   if(S.mode!=='auto'){showDet(scriptLang(text));return}
-  if(!(c>0)){if(++S.noConf===3)toast('Auto-detect is limited on this device. Pick your language chip for best results.');c=.8}
+  if(!(c>0)){if(++S.noConf===3)toast('Auto-detect is limited on this device. Tap your language chip for best results.');c=.8}
   S.score[S.idx]=c;
   if(c>=.7){S.tried.clear();showDet(LANGS[S.idx].slice(0,2));return}
   S.tried.add(S.idx);let n=pickNext();
@@ -220,9 +234,10 @@ function onFinal(text,c){
   showDet(LANGS[S.idx].slice(0,2));
   if(n!==S.idx){S.idx=n;if(S.sr)try{S.sr.stop()}catch(e){}}}
 function listen(){
-  if(!S.rec||!SR)return;const r=new SR();
+  if(!S.rec||!SR||S.running)return;
+  const r=new SR(),born=Date.now();
   r.lang=curLang();r.continuous=true;r.interimResults=true;r.maxAlternatives=1;
-  r.onstart=()=>{$('hint').textContent='Listening · '+NAME[r.lang.slice(0,2)]+(S.mode==='auto'?' (auto)':'')};
+  r.onstart=()=>{S.running=true;$('hint').textContent='Listening · '+NAME[r.lang.slice(0,2)]+(S.mode==='auto'?' (auto)':'');ind()};
   r.onresult=e=>{let im='';for(let i=e.resultIndex;i<e.results.length;i++){const x=e.results[i];
     if(x.isFinal){S.im='';onFinal(x[0].transcript.trim(),x[0].confidence)}else im+=x[0].transcript}
     S.im=im;renderLive()};
@@ -230,46 +245,67 @@ function listen(){
     if(k==='not-allowed'||k==='service-not-allowed'){toast('Microphone/speech permission blocked. Allow it in browser settings.');stopRec()}
     else if(k==='language-not-supported'){S.bad.add(S.idx);S.score[S.idx]=-1;toast(NAME[r.lang.slice(0,2)]+' speech is not supported on this device.');
       if(S.mode==='auto'){const ok=[0,1,2].find(j=>!S.bad.has(j));if(ok===undefined){stopRec();return}S.idx=ok}else stopRec()}
-    else if(k==='network')toast('Speech recognition needs an internet connection.');
-    else if(k==='audio-capture')toast('Microphone not available or in use by another app.')};
-  r.onend=()=>{S.im='';renderLive();if(S.rec)setTimeout(listen,250)};
-  S.sr=r;try{r.start()}catch(e){}}
+    else if(k==='network')toast('Speech recognition needs an internet connection. Audio keeps recording.');
+    else if(k==='audio-capture'){if(S.mr&&S.mr.state==='recording'){dropAudio();$('aud').checked=false;toast('This phone cannot record audio and transcribe together. Continuing with transcription only.')}else toast('Microphone not available or in use by another app.')}};
+  r.onend=()=>{S.running=false;S.im='';renderLive();ind();if(!S.rec)return;
+    S.fast=Date.now()-born<1500?S.fast+1:0;setTimeout(listen,S.fast>4?1500:30)};   // restart immediately; back off only if it keeps failing
+  S.sr=r;try{r.start()}catch(e){S.running=false}}
+function dropAudio(){try{S.mr&&S.mr.state!=='inactive'&&S.mr.stop()}catch(e){}S.stream&&S.stream.getTracks().forEach(t=>t.stop());S.stream=null;ind()}
 async function startRec(){
+  if(S.rec)return;
   if(!SR&&!(window.MediaRecorder&&$('aud').checked)){toast('Speech recognition is not supported here. Use Chrome, Edge or Safari.');return}
-  S.rec=true;S.t0=Date.now();S.im='';S.tried=new Set();S.bad=S.bad||new Set();S.score=[0,0,0];S.noConf=0;S.idx=S.mode==='auto'?S.idx:0;renderLive();S.chunks=[];S.blob=null;$('audbtn').disabled=true;
-  $('stage').classList.add('rec');$('hint').textContent=S.mode==='auto'?'Listening — English, Hindi or Gujarati':'Listening…';
+  S.rec=true;S.t0=Date.now()-(S.dur||0)*1000;S.im='';S.tried=new Set();S.bad=S.bad||new Set();S.score=[0,0,0];S.noConf=0;S.fast=0;S.running=false;S.chunks=[];S.blob=null;
+  $('audbtn').disabled=true;$('pc').style.display='none';$('stage').classList.add('rec');$('hint').textContent='Starting…';renderLive();
   S.tm=setInterval(()=>$('timer').textContent=clock(),500);
+  S.wd=setInterval(()=>{if(S.rec&&!S.running)listen();ind()},3000);   // watchdog: revive speech recognition if it ever stalls
+  wl(true);
   if($('aud').checked&&navigator.mediaDevices&&window.MediaRecorder){
-    try{S.stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    try{S.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
       const mt=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
       S.mr=new MediaRecorder(S.stream,mt?{mimeType:mt}:{});S.ext=(S.mr.mimeType||'').includes('mp4')?'mp4':'webm';
       S.mr.ondataavailable=e=>e.data.size&&S.chunks.push(e.data);
-      S.mr.onstop=()=>{S.blob=new Blob(S.chunks,{type:S.mr.mimeType});$('audbtn').disabled=false;$('audbtn').querySelector('span').textContent='.'+S.ext};
-      S.mr.start(1000)}catch(e){toast('Audio capture unavailable ('+(e.name||'error')+')')}}
-  if(S.rec)listen()}
+      S.mr.onstop=()=>{if(!S.chunks.length)return;S.blob=new Blob(S.chunks,{type:S.mr.mimeType});$('audbtn').disabled=false;$('audbtn').querySelector('span').textContent='.'+S.ext;
+        if(S.url)URL.revokeObjectURL(S.url);S.url=URL.createObjectURL(S.blob);$('player').src=S.url;$('pc').style.display='block';ind()};
+      S.mr.start(1000)}catch(e){toast('Audio capture unavailable ('+(e.name||'error')+'). Transcription continues.')}}
+  ind();if(S.rec)listen()}
 function stopRec(){
-  S.rec=false;clearInterval(S.tm);
-  try{S.sr&&S.sr.stop()}catch(e){}S.sr=null;
-  try{S.mr&&S.mr.state!=='inactive'&&S.mr.stop()}catch(e){}
-  S.stream&&S.stream.getTracks().forEach(t=>t.stop());S.stream=null;
-  $('stage').classList.remove('rec');S.im='';renderLive();$('hint').textContent=S.segs.length?'Recording saved to Transcript':'Tap the mic to start recording';
-  if(S.segs.length)toast('Stopped. If any text looks wrong, tap “Fix languages with AI” in Transcript.')}
+  if(!S.rec)return;S.rec=false;clearInterval(S.tm);clearInterval(S.wd);wl(false);
+  S.dur=Math.floor((Date.now()-S.t0)/1000);
+  try{S.sr&&S.sr.stop()}catch(e){}S.sr=null;S.running=false;dropAudio();
+  $('stage').classList.remove('rec');S.im='';renderLive();ind();save();
+  $('hint').textContent=S.segs.length?'Saved · '+fmt(S.dur):'Tap the mic to start recording';
+  if(S.segs.length){if($('auto').checked)setTimeout(finalizeAI,1200);else toast('Stopped. Open Insights to generate the report.')}else toast('No speech was captured.')}
 $('orb').onclick=()=>S.rec?stopRec():startRec();
-if(isIOS)$('aud').checked=false;
+if(isIOS){$('aud').checked=false}   // iOS usually cannot share the mic between recorder and recognizer
 
-$('fix').onclick=async()=>{
-  if(!S.segs.length){toast('No transcript to fix yet.');return}
-  const b=$('fix');b.disabled=true;b.innerHTML='<span class="spin"></span>Fixing languages…';
-  try{const sm=window.claude&&await claude.use('sample');
-    if(!sm){toast('AI cleanup is available in the Claude app version.');return}
-    const r=await sm.json(`These lines come from speech recognition that may have used the WRONG language model, for a meeting in English, Hindi or Gujarati (mixed use is possible). For each line decide which language was actually spoken and rewrite it in that language's own script (English in Latin, Hindi in Devanagari, Gujarati in Gujarati script). Undo phonetic transliteration (e.g. English words written in Devanagari) and fix obvious recognition errors. Do not translate or add content.
-Return ONLY a JSON array with one object per line: [{"i":0,"l":"en|hi|gu","x":"corrected text"}]
+/* AI helpers (Claude when available) */
+async function getSm(force){if(force||S.smp===undefined){try{S.smp=window.claude?await claude.use('sample'):null}catch(e){S.smp=null}}return S.smp}
+const chunk=(t,n)=>{const o=[];let i=0;while(i<t.length){let j=Math.min(t.length,i+n);if(j<t.length){const k=t.lastIndexOf('\n',j);if(k>i)j=k}o.push(t.slice(i,j));i=j}return o};
+async function aiFix(quiet){
+  if(!S.segs.length){quiet||toast('No transcript to fix yet.');return false}
+  const b=$('fix');b.disabled=true;
+  try{const sm=await getSm(!quiet);
+    if(!sm){quiet||toast('AI cleanup is available in the Claude app version.');return false}
+    const n=S.segs.length,step=70;
+    for(let a=0;a<n;a+=step){
+      b.innerHTML=`<span class="spin"></span>Polishing ${Math.min(a+step,n)}/${n}…`;
+      const ctx=S.segs.slice(Math.max(0,a-3),a).map(s=>s.x).join(' / ');
+      const lines=S.segs.slice(a,a+step).map((s,k)=>(a+k)+'|'+s.x).join('\n');
+      const r=await sm.json(`These lines come from phone speech recognition of a meeting where speakers switch between English, Gujarati and Hindi, sometimes inside one sentence. The recognizer may have used the WRONG language model for some lines.
+Rewrite each line so that every part is in the language actually spoken and in that language's own script: English in Latin letters, Gujarati in Gujarati script, Hindi in Devanagari. Keep mixed-language sentences mixed — do NOT translate. Undo phonetic transliteration (e.g. English words written in Devanagari) and fix obvious recognition errors and punctuation. Do not add or remove content.
+Previous lines for context only (do not output): ${ctx||'(none)'}
+Return ONLY a JSON array, one object per line: [{"i":<number>,"x":"corrected text"}]
 Lines:
-`+S.segs.map((s,i)=>i+'|'+s.x).join('\n').slice(0,20000));
-    if(Array.isArray(r)){r.forEach(o=>{const s=S.segs[o.i];if(s&&o.x){s.x=String(o.x);s.l=['en','hi','gu'].includes(o.l)?o.l:scriptLang(s.x)}});renderSegs();renderLive();save();toast('Transcript cleaned up')}
-    else toast('AI cleanup failed. Try again.')
-  }catch(e){toast('AI cleanup unavailable right now.')}
-  finally{b.disabled=false;b.innerHTML='✨ Fix languages with AI'}};
+${lines}`);
+      if(Array.isArray(r))r.forEach(o=>{const s=S.segs[o.i];if(s&&o.x){s.x=String(o.x);s.l=scriptLang(s.x)}})}
+    renderSegs();renderLive();save();quiet||toast('Transcript polished');return true
+  }catch(e){quiet||toast('AI cleanup unavailable right now.');return false}
+  finally{b.disabled=false;b.innerHTML='✨ Fix languages with AI'}}
+$('fix').onclick=()=>aiFix(false);
+async function finalizeAI(){
+  $('hint').textContent='Polishing transcript…';await aiFix(true);
+  $('hint').textContent='Writing report…';await makeReport(true);
+  $('hint').textContent='Report ready · '+fmt(S.dur||0);toast('Transcript polished and report ready — see Insights')}
 
 /* action items */
 function renderActs(){$('al').innerHTML=S.acts.length?S.acts.map((a,i)=>`<li class="${a.d?'d':''}"><input type="checkbox" data-i="${i}" ${a.d?'checked':''}><span>${esc(a.t)}</span><button data-x="${i}" aria-label="Delete">✕</button></li>`).join(''):'<li style="color:var(--mut);justify-content:center">No action items yet</li>'}
@@ -278,10 +314,11 @@ $('aib').onclick=()=>{addAct($('ai').value);$('ai').value='';renderActs();save()
 $('ai').onkeydown=e=>{if(e.key==='Enter')$('aib').click()};
 $('al').onclick=e=>{const t=e.target;if(t.dataset.x!==undefined)S.acts.splice(+t.dataset.x,1);else if(t.dataset.i!==undefined)S.acts[+t.dataset.i].d=t.checked;else return;renderActs();save()};
 
-/* summary: Claude when available, on-device fallback otherwise */
+/* summary & detailed report: Claude when available, on-device fallback otherwise */
 function renderSum(){const c=$('sumc'),u=S.sum;if(!u){c.style.display='none';return}c.style.display='block';
   const L=a=>a&&a.length?'<ul>'+a.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'';
-  c.innerHTML=`<h3>Summary</h3><p>${esc(u.summary||'')}</p>${u.points&&u.points.length?'<h4>Key points</h4>'+L(u.points):''}${u.decisions&&u.decisions.length?'<h4>Decisions</h4>'+L(u.decisions):''}`}
+  const T=(u.topics||[]).map(t=>`<h4>${esc(t.h)}</h4><p>${esc(t.d||'')}</p>${L(t.p)}`).join('');
+  c.innerHTML=`<h3>Executive summary</h3><p>${esc(u.summary||'')}</p>${L(u.points).replace(/^/,u.points&&u.points.length?'<h4>Key points</h4>':'')}${T?'<h3 style="margin-top:18px">Detailed report</h3>'+T:''}${u.decisions&&u.decisions.length?'<h4>Decisions</h4>'+L(u.decisions):''}${u.questions&&u.questions.length?'<h4>Open questions</h4>'+L(u.questions):''}${u.next&&u.next.length?'<h4>Next steps</h4>'+L(u.next):''}`}
 function localSum(text){
   const W=s=>s.toLowerCase().split(/[^\p{L}\p{M}]+/u).filter(w=>w.length>3);
   const sents=text.split(/(?<=[.!?।])\s+|\n+/).map(s=>s.replace(/^\[\d+:\d+\]\s*/,'').trim()).filter(s=>s.length>14);
@@ -290,36 +327,56 @@ function localSum(text){
   const AR=/\b(will|need to|needs to|should|must|todo|to-do|action|follow up|deadline|please|assign|by (mon|tue|wed|thu|fri|sat|sun|tomorrow|next))\b|करना|करेंगे|चाहिए|जरूरी|ज़रूरी|કરવું|કરીશ|કરવાનું|જોઈએ|કરશે/i;
   const ord=a=>a.sort((x,y)=>x.i-y.i).map(o=>o.s);
   return{summary:ord(sc.slice(0,3)).join(' '),points:ord(sc.slice(3,8)),decisions:[],actionItems:sents.filter(s=>AR.test(s)).slice(0,8).map(t=>({task:t,owner:''}))}}
-$('gen').onclick=async()=>{
+function localReport(text){const r=localSum(text),G=Math.min(5,Math.max(1,Math.ceil(S.segs.length/6))),sz=Math.ceil(S.segs.length/G);r.topics=[];
+  for(let i=0;i<S.segs.length;i+=sz){const g=S.segs.slice(i,i+sz),s=localSum(g.map(x=>x.x).join('. ')).summary||g.map(x=>x.x).join(' ').slice(0,300);
+    r.topics.push({h:`Part ${r.topics.length+1} (${g[0].t}–${g[g.length-1].t})`,d:s,p:[]})}return r}
+async function makeReport(quiet){
   const text=S.segs.map(s=>`[${s.t}] ${s.x}`).join('\n');
-  if(text.length<20){toast('Record or type some conversation first.');return}
-  const b=$('gen');b.disabled=true;b.innerHTML='<span class="spin"></span>Analysing conversation…';
-  let res=null;
-  try{const sm=window.claude&&await claude.use('sample');
-    if(sm){res=await sm.json(`You are a meeting assistant. The transcript below may mix English, Gujarati and Hindi (speech-to-text output; fix obvious recognition errors from context). Write ALL output in ${$('slang').value}.
-Return ONLY JSON: {"summary":"3-5 sentence overview","keyPoints":["..."],"decisions":["..."],"actionItems":[{"task":"clear actionable task","owner":"name or empty"}]}
+  if(text.length<20){quiet||toast('Record or type some conversation first.');return}
+  const b=$('gen'),orig='✨ Generate summary &amp; detailed report';b.disabled=true;b.innerHTML='<span class="spin"></span>Writing report…';
+  let res=null,note='';
+  try{const sm=await getSm(!quiet);
+    if(sm){let src=text;const lg=$('slang').value,li=lg==='mixed'?'Write each part in the language(s) used in the recording, keeping mixed-language phrases as spoken.':`Write the entire report in ${lg}.`;
+      if(text.length>18000){const parts=chunk(text,14000),notes=[];
+        for(let i=0;i<parts.length;i++){b.innerHTML=`<span class="spin"></span>Reading part ${i+1}/${parts.length}…`;
+          const r=await sm.json(`Take thorough meeting notes (topics, facts, numbers, names, decisions, tasks with owners and deadlines) from part ${i+1}/${parts.length} of a transcript that mixes English, Gujarati and Hindi. Return ONLY JSON {"notes":"..."}.\n`+parts[i]);notes.push((r&&r.notes)||'')}
+        src=notes.join('\n---\n')}
+      b.innerHTML='<span class="spin"></span>Writing report…';
+      res=await sm.json(`You are an expert meeting secretary. Below is a transcript (or detailed notes) of a recorded meeting that may mix English, Gujarati and Hindi (speech-to-text: fix obvious recognition errors from context). ${li}
+Produce a complete report. Be specific: include names, numbers, dates and reasons that were mentioned; do not invent facts.
+Return ONLY JSON:
+{"title":"short meeting title","executiveSummary":"5-8 sentence overview","keyPoints":["5-8 bullets"],"topics":[{"heading":"topic","details":"3-6 sentences of what was discussed","points":["specific points"]}],"decisions":["..."],"actionItems":[{"task":"clear task","owner":"name or empty","due":"deadline or empty"}],"openQuestions":["..."],"nextSteps":["..."]}
 Transcript:
-${text.slice(0,24000)}`)}
+${src}`)}
   }catch(e){res=null}
-  let note='';
-  if(!res||typeof res!=='object'){res=localSum(text);note='Used the on-device summary (AI summary unavailable).'}
-  S.sum={summary:res.summary||'',points:res.keyPoints||res.points||[],decisions:res.decisions||[]};
-  (res.actionItems||[]).forEach(a=>addAct(typeof a==='string'?a:((a.owner?a.owner+': ':'')+a.task)));
-  renderSum();renderActs();save();b.disabled=false;b.innerHTML='✨ Regenerate summary';toast(note||'Summary and action points ready');
-};
+  if(!res||typeof res!=='object'){res=localReport(text);note='Used the on-device report (AI unavailable).'}
+  S.sum={summary:res.executiveSummary||res.summary||'',points:res.keyPoints||res.points||[],decisions:res.decisions||[],questions:res.openQuestions||[],next:res.nextSteps||[],
+    topics:(res.topics||[]).map(t=>({h:t.heading||t.h||'',d:t.details||t.d||'',p:t.points||t.p||[]}))};
+  if(res.title&&!$('title').value.trim())$('title').value=res.title;
+  (res.actionItems||[]).forEach(a=>addAct(typeof a==='string'?a:((a.owner?a.owner+': ':'')+a.task+(a.due?' (due '+a.due+')':''))));
+  renderSum();renderActs();save();b.disabled=false;b.innerHTML=orig;quiet||toast(note||'Report ready');
+  if(!quiet&&!$('s2').classList.contains('on'))go(2)}
+$('gen').onclick=()=>makeReport(false);
 
 /* export */
-function data(){return{title:$('title').value.trim()||'Untitled meeting',date:$('date').value,att:$('att').value.trim(),segs:S.segs,sum:S.sum,acts:S.acts}}
-function blocks(d){const B=[],h=t=>B.push({t,sz:14,b:1,h:1}),p=(t,sz)=>B.push({t,sz:sz||11}),u=d.sum;
-  B.push({t:d.title,sz:20,b:1,title:1});p('Date: '+d.date);if(d.att)p('Attendees: '+d.att);
-  if(u){B.push({t:'',sz:6});h('Summary');p(u.summary);if(u.points.length){h('Key points');u.points.forEach(x=>p('• '+x))}if(u.decisions.length){h('Decisions');u.decisions.forEach(x=>p('• '+x))}}
-  B.push({t:'',sz:6});h('Action items');d.acts.length?d.acts.forEach(a=>p((a.d?'[x] ':'[ ] ')+a.t)):p('(none)');
-  B.push({t:'',sz:6});h('Transcript');d.segs.length?d.segs.forEach(s=>p(`[${s.t}] ${s.x}`)):p('(none)');return B}
-const asText=(d,md)=>blocks(d).map(b=>md?(b.title?'# ':b.h?'## ':'')+b.t:b.t).join('\n');
-function asHTML(d){const B=blocks(d).map(b=>b.title?`<h1>${esc(b.t)}</h1>`:b.h?`<h2>${esc(b.t)}</h2>`:`<p>${esc(b.t)}</p>`).join('');
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(d.title)}</title><style>body{font-family:system-ui,sans-serif;max-width:760px;margin:30px auto;padding:0 16px;line-height:1.55}p{margin:.3em 0}</style></head><body>${B}</body></html>`}
+const LN={EN:'English',GU:'Gujarati',HI:'Hindi'};
+function data(){return{title:$('title').value.trim()||'Untitled meeting',date:$('date').value,att:$('att').value.trim(),dur:S.dur||0,segs:S.segs.map(s=>({t:s.t,l:lab(s.x),x:s.x})),sum:S.sum,acts:S.acts,langs:[...new Set(S.segs.flatMap(s=>labels(s.x)))].map(c=>LN[c])}}
+function blocks(d){const B=[],h=t=>B.push({t,sz:14,b:1,h:1}),p=(t,sz,b,sub)=>B.push({t,sz:sz||11,b:b?1:0,sub:sub?1:0}),sp=()=>B.push({t:'',sz:6}),u=d.sum;
+  B.push({t:d.title,sz:22,b:1,title:1});
+  p('Date: '+d.date);if(d.dur)p('Duration: '+fmt(d.dur));if(d.att)p('Attendees: '+d.att);if(d.langs.length)p('Languages: '+d.langs.join(', '));
+  if(u){sp();h('Executive summary');p(u.summary);
+    if(u.points&&u.points.length){sp();h('Key points');u.points.forEach(x=>p('• '+x))}
+    if(u.topics&&u.topics.length){sp();h('Detailed report');u.topics.forEach(t=>{p(t.h,12,1,1);p(t.d);(t.p||[]).forEach(x=>p('   – '+x))})}
+    if(u.decisions&&u.decisions.length){sp();h('Decisions');u.decisions.forEach(x=>p('• '+x))}}
+  sp();h('Action items');d.acts.length?d.acts.forEach(a=>p((a.d?'[x] ':'[ ] ')+a.t)):p('(none)');
+  if(u&&u.questions&&u.questions.length){sp();h('Open questions');u.questions.forEach(x=>p('• '+x))}
+  if(u&&u.next&&u.next.length){sp();h('Next steps');u.next.forEach(x=>p('• '+x))}
+  sp();h('Full transcript');d.segs.length?d.segs.forEach(s=>p(`[${s.t}] [${s.l}] ${s.x}`)):p('(none)');return B}
+const asText=(d,md)=>blocks(d).map(b=>md?(b.title?'# ':b.h?'## ':b.sub?'### ':'')+b.t:b.title?b.t+'\n'+'='.repeat(b.t.length):b.h?b.t.toUpperCase()+'\n'+'-'.repeat(b.t.length):b.t).join('\n');
+function asHTML(d){const B=blocks(d).map(b=>b.title?`<h1>${esc(b.t)}</h1>`:b.h?`<h2>${esc(b.t)}</h2>`:b.sub?`<h3>${esc(b.t)}</h3>`:b.t?`<p>${esc(b.t)}</p>`:'').join('');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(d.title)}</title><style>body{font-family:system-ui,"Noto Sans Gujarati","Noto Sans Devanagari",sans-serif;max-width:780px;margin:30px auto;padding:0 16px;line-height:1.6;color:#181a2a}h1{margin-bottom:4px}h2{color:#4338ca;border-bottom:1px solid #e5e7f3;padding-bottom:4px;margin-top:28px}p{margin:.35em 0}</style></head><body>${B}</body></html>`}
 async function asDocx(d){
-  const P=b=>`<w:p><w:r><w:rPr>${b.b?'<w:b/>':''}<w:sz w:val="${b.sz*2}"/></w:rPr><w:t xml:space="preserve">${esc(b.t)}</w:t></w:r></w:p>`;
+  const P=b=>`<w:p><w:pPr>${b.h?'<w:keepNext/>':''}<w:spacing w:before="${b.h?240:0}" w:after="${b.h?80:60}"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Nirmala UI"/>${b.b?'<w:b/><w:bCs/>':''}${b.h?'<w:color w:val="4338CA"/>':''}<w:sz w:val="${b.sz*2}"/><w:szCs w:val="${b.sz*2}"/></w:rPr><w:t xml:space="preserve">${esc(b.t)}</w:t></w:r></w:p>`;
   const z=new JSZip();
   z.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
   z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
@@ -328,15 +385,18 @@ async function asDocx(d){
 function asPdf(d){
   const B=blocks(d),doc=new jspdf.jsPDF({unit:'pt',format:'a4'}),W=595.28,H=841.89,m=48,nonLatin=/[^\u0000-\u024F\u2000-\u206F\u2190-\u27BF]/.test(B.map(b=>b.t).join(''));
   if(!nonLatin){let y=m;
-    B.forEach(b=>{doc.setFont('helvetica',b.b?'bold':'normal');doc.setFontSize(b.sz);doc.splitTextToSize(b.t||' ',W-2*m).forEach(l=>{if(y>H-m){doc.addPage();y=m}doc.text(l,m,y);y+=b.sz*1.4})});
+    B.forEach(b=>{doc.setFont('helvetica',b.b?'bold':'normal');doc.setFontSize(b.sz);doc.setTextColor(b.h?'#4338ca':'#111111');
+      doc.splitTextToSize(b.t||' ',W-2*m).forEach(l=>{if(y>H-m){doc.addPage();y=m}doc.text(l,m,y);y+=b.sz*1.4})});
+    const N=doc.getNumberOfPages();for(let i=1;i<=N;i++){doc.setPage(i);doc.setFontSize(9);doc.setTextColor('#888888');doc.text(`${d.title}  ·  ${i} / ${N}`,W/2,H-24,{align:'center'})}
     return doc.output('arraybuffer')}
-  // Gujarati/Hindi: draw with the device's fonts onto page canvases so every script renders correctly
-  const K=2,cv=[],mk=()=>{const c=document.createElement('canvas');c.width=W*K;c.height=H*K;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle='#111';x.textBaseline='top';cv.push(c);return x};
+  // Gujarati/Hindi/mixed: draw with the device's fonts onto page canvases so every script renders correctly
+  const K=2,cv=[],FF='"Noto Sans Gujarati","Noto Sans Devanagari","Nirmala UI",system-ui,sans-serif',mk=()=>{const c=document.createElement('canvas');c.width=W*K;c.height=H*K;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.textBaseline='top';cv.push(c);return x};
   let x=mk(),y=m*K;
-  B.forEach(b=>{x.font=`${b.b?'bold ':''}${b.sz*K}px "Noto Sans Gujarati","Noto Sans Devanagari",system-ui,sans-serif`;const mw=(W-2*m)*K;
+  B.forEach(b=>{x.font=`${b.b?'bold ':''}${b.sz*K}px ${FF}`;x.fillStyle=b.h?'#4338ca':'#111';const mw=(W-2*m)*K;
     let line='';const out=[];(b.t||' ').split(/(\s+)/).forEach(w=>{if(x.measureText(line+w).width>mw&&line){out.push(line);line=w.trimStart()}else line+=w});out.push(line);
     out.forEach(l=>{if(y>(H-m)*K){x=mk();y=m*K}x.fillText(l,m*K,y);y+=b.sz*1.5*K})});
-  cv.forEach((c,i)=>{if(i)doc.addPage();doc.addImage(c.toDataURL('image/jpeg',.88),'JPEG',0,0,W,H)});
+  cv.forEach((c,i)=>{const g=c.getContext('2d');g.font=`${9*K}px ${FF}`;g.fillStyle='#888';g.textAlign='center';g.fillText(`${d.title}  ·  ${i+1} / ${cv.length}`,W*K/2,(H-34)*K);
+    if(i)doc.addPage();doc.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,W,H)});
   return doc.output('arraybuffer')}
 async function dl(name,payload,mime){
   try{const D=window.claude&&await claude.use('downloads');if(D){await D.save({filename:name,data:payload});return}}
@@ -345,11 +405,12 @@ async function dl(name,payload,mime){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 $('s3').addEventListener('click',async e=>{
   const f=(e.target.closest('.fmt')||{dataset:{}}).dataset.f;if(!f)return;const d=data(),n=(d.title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'meeting')+'-'+d.date;
+  if(f!=='audio'&&f!=='json'&&S.segs.length&&!S.sum)toast('Tip: generate the report in Insights first so it is included.');
   try{
-    if(f==='txt')await dl(n+'.txt',asText(d,0),'text/plain');
-    else if(f==='md')await dl(n+'.md',asText(d,1),'text/markdown');
-    else if(f==='html')await dl(n+'.html',asHTML(d),'text/html');
-    else if(f==='json')await dl(n+'.json',JSON.stringify(d,null,2),'application/json');
+    if(f==='txt')await dl(n+'.txt','\ufeff'+asText(d,0),'text/plain;charset=utf-8');
+    else if(f==='md')await dl(n+'.md',asText(d,1),'text/markdown;charset=utf-8');
+    else if(f==='html')await dl(n+'.html',asHTML(d),'text/html;charset=utf-8');
+    else if(f==='json')await dl(n+'.json',JSON.stringify(Object.assign({},d,{report:d.sum}),null,2),'application/json');
     else if(f==='docx')await dl(n+'.docx',await asDocx(d));
     else if(f==='pdf')await dl(n+'.pdf',asPdf(d),'application/pdf');
     else if(f==='audio'&&S.blob)await dl(n+'-audio.'+S.ext,S.blob);
